@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>dusync 手机端</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f4f6f8; color: #1c2733; }
+#app { max-width: 640px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+.hidden { display: none !important; }
+
+/* header */
+header { position: sticky; top: 0; z-index: 10; background: #1a6fb5; color: #fff; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+header .user { display: flex; align-items: center; gap: 8px; }
+header .chip { background: rgba(255,255,255,.2); border-radius: 999px; padding: 4px 10px; font-size: 13px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header button { background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+
+/* cards */
+.card { background: #fff; border-radius: 12px; margin: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.card h2 { margin: 0 0 6px; font-size: 16px; }
+.card p { margin: 0; font-size: 13px; color: #5a6b7a; line-height: 1.5; }
+label { display: block; margin-top: 12px; font-size: 13px; color: #5a6b7a; }
+input[type=text], input[type=password] { width: 100%; margin-top: 6px; padding: 11px 12px; font-size: 15px; border: 1px solid #cbd5de; border-radius: 8px; outline: none; background: #fff; }
+input[type=text]:focus, input[type=password]:focus { border-color: #1a6fb5; }
+.btn { display: inline-block; border: none; border-radius: 8px; padding: 11px 16px; font-size: 15px; cursor: pointer; text-align: center; }
+.btn-primary { background: #1a6fb5; color: #fff; width: 100%; margin-top: 16px; }
+.btn-primary:active { background: #14598f; }
+.btn-ghost { background: #e8eef4; color: #1a6fb5; width: 100%; margin-top: 8px; }
+.row { display: flex; gap: 8px; }
+.row .btn { flex: 1; }
+.btn-sm { padding: 6px 10px; font-size: 13px; border-radius: 6px; }
+.btn-dl { background: #e6f2fb; color: #1a6fb5; }
+.btn-del { background: #fdeeee; color: #c0392b; }
+.btn:disabled { opacity: .5; }
+
+/* toolbar */
+.toolbar { padding: 12px 12px 0; display: flex; gap: 8px; }
+.toolbar .btn { margin: 0; flex: 1; }
+.toolbar .btn-upload { background: #1a6fb5; color: #fff; }
+.toolbar .btn-refresh { background: #fff; color: #1a6fb5; border: 1px solid #cbd5de; }
+
+/* file list */
+#fileList { list-style: none; margin: 8px 8px 16px; padding: 0; }
+#fileList li { background: #fff; border-radius: 10px; padding: 12px; margin: 8px 4px; box-shadow: 0 1px 2px rgba(0,0,0,.06); display: flex; align-items: center; gap: 10px; }
+.finfo { flex: 1; min-width: 0; }
+.fname { font-size: 14px; font-weight: 500; word-break: break-all; }
+.fmeta { font-size: 12px; color: #8a99a8; margin-top: 2px; }
+.fbadge { display: inline-block; background: #eef4f9; color: #1a6fb5; border-radius: 4px; padding: 1px 6px; font-size: 11px; margin-left: 6px; }
+.facts { display: flex; flex-direction: column; gap: 6px; }
+.empty { text-align: center; color: #8a99a8; font-size: 14px; padding: 40px 16px; }
+
+/* toast */
+#toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); max-width: 90%; background: rgba(20,30,40,.92); color: #fff; border-radius: 8px; padding: 10px 16px; font-size: 14px; z-index: 99; opacity: 0; pointer-events: none; transition: opacity .25s; }
+#toast.show { opacity: 1; }
+
+footer { text-align: center; color: #9aa8b4; font-size: 12px; padding: 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>dusync 同步盘</h1>
+    <div class="user" id="userArea">
+      <span class="chip hidden" id="userChip"></span>
+      <button id="btnLogout" class="hidden">退出</button>
+    </div>
+  </header>
+
+  <!-- 登录 / 注册 -->
+  <section id="loginView">
+    <div class="card">
+      <h2>登录同步账号</h2>
+      <p>使用与电脑端相同的账号密码。首次使用可点击“注册并登录”自动创建账号。</p>
+      <label>服务器 <span id="serverLabel" style="font-weight:600;color:#1a6fb5;"></span></label>
+      <label>用户名
+        <input type="text" id="loginUser" autocomplete="username" placeholder="如 alice">
+      </label>
+      <label>密码
+        <input type="password" id="loginPass" autocomplete="current-password" placeholder="密码">
+      </label>
+      <button class="btn btn-primary" id="btnLogin">登录</button>
+      <button class="btn btn-ghost" id="btnRegister">注册并登录</button>
+      <p style="margin-top:10px;font-size:12px;color:#8a99a8;">说明：手机端与电脑端共享同一账号的同一文件夹；在手机上删除文件会同步到其他设备。</p>
+    </div>
+  </section>
+
+  <!-- 文件管理 -->
+  <section id="filesView" class="hidden">
+    <div class="toolbar">
+      <label class="btn btn-upload" for="fileInput">上传文件</label>
+      <input type="file" id="fileInput" multiple class="hidden">
+      <button class="btn btn-refresh" id="btnRefresh">刷新</button>
+    </div>
+    <ul id="fileList"></ul>
+    <div id="fileEmpty" class="empty">
+      文件夹为空<br><br>
+      点击“上传文件”把手机上的文件放入共享文件夹<br>
+      其他设备的改动，点击“刷新”即可拉取
+    </div>
+  </section>
+
+  <footer>dusync mobile client · 与 PC 端同一账号共享同一文件夹</footer>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ---------- pure JS SHA-256 (byte oriented, works over plain HTTP) ---------- */
+(function () {
+  var K = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ];
+  var H0 = [
+    0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+    0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19
+  ];
+  function rotr(x, n) { return (x >>> n) | (x << (32 - n)); }
+  window.sha256Bytes = function (bytes) {
+    var l = bytes.length;
+    var padLen = (((l + 1 + 8 + 63) >> 6) << 6);
+    var msg = new Uint8Array(padLen);
+    msg.set(bytes, 0);
+    msg[l] = 0x80;
+    var dv = new DataView(msg.buffer);
+    dv.setUint32(padLen - 8, Math.floor(l / 0x20000000), false);
+    dv.setUint32(padLen - 4, (l << 3) >>> 0, false);
+    var w = new Int32Array(64);
+    var H = H0.slice();
+    for (var off = 0; off < padLen; off += 64) {
+      for (var i = 0; i < 16; i++) w[i] = dv.getInt32(off + i * 4, false);
+      for (i = 16; i < 64; i++) {
+        var s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        var s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      var a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+      for (i = 0; i < 64; i++) {
+        var S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+        var ch = (e & f) ^ (~e & g);
+        var t1 = (h + S1 + ch + K[i] + w[i]) | 0;
+        var S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+        var maj = (a & b) ^ (a & c) ^ (b & c);
+        var t2 = (S0 + maj) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0;
+        d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+      H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+    }
+    var out = "";
+    for (var j = 0; j < 8; j++) {
+      var v = H[j] >>> 0;
+      out += ("00000000" + v.toString(16)).slice(-8);
+    }
+    return out;
+  };
+})();
+
+/* ---------- app state ---------- */
+var TOKEN_KEY = "dusync_token";
+var USER_KEY = "dusync_user";
+var state = {
+  token: localStorage.getItem(TOKEN_KEY) || "",
+  username: localStorage.getItem(USER_KEY) || "",
+  files: []   // [{path,size,mtime,sha256,version}]
+};
+
+var $ = function (id) { return document.getElementById(id); };
+var toastTimer = null;
+function toast(msg) {
+  var el = $("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.classList.remove("show"); }, 2600);
+}
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function fmtSize(n) {
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1048576).toFixed(1) + " MB";
+}
+
+/* ---------- api ---------- */
+function apiBase() { return location.origin; }
+
+function apiHeaders(extra) {
+  var h = { "X-Token": state.token };
+  if (extra) {
+    for (var k in extra) h[k] = extra[k];
+  }
+  return h;
+}
+
+function apiUrl(path, query) {
+  var url = apiBase() + path;
+  if (query) {
+    var parts = [];
+    for (var k in query) parts.push(encodeURIComponent(k) + "=" + encodeURIComponent(query[k]));
+    url += "?" + parts.join("&");
+  }
+  return url;
+}
+
+async function apiFetch(path, opts) {
+  opts = opts || {};
+  var resp = await fetch(apiUrl(path, opts.query), {
+    method: opts.method || "GET",
+    headers: opts.headers || apiHeaders(),
+    body: opts.body
+  });
+  if (resp.status === 401) {
+    logout();
+    throw new Error("登录已失效，请重新登录");
+  }
+  return resp;
+}
+
+async function apiJson(path, opts) {
+  var resp = await apiFetch(path, opts);
+  var payload = null;
+  var text = await resp.text();
+  try { payload = JSON.parse(text); } catch (e) { /* ignore */ }
+  if (!resp.ok) {
+    throw new Error((payload && payload.error) ? payload.error : ("HTTP " + resp.status));
+  }
+  return payload;
+}
+
+/* ---------- login / logout ---------- */
+async function doLogin(register) {
+  var u = $("loginUser").value.trim();
+  var p = $("loginPass").value;
+  if (!u || !p) { toast("请输入用户名和密码"); return; }
+  var path = register ? "/api/register" : "/api/login";
+  try {
+    var payload = await apiJson(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    state.token = payload.token;
+    state.username = payload.username;
+    localStorage.setItem(TOKEN_KEY, state.token);
+    localStorage.setItem(USER_KEY, state.username);
+    enterFiles();
+  } catch (err) {
+    if (register && /already exists/.test(err.message)) {
+      toast("账号已存在，请直接登录");
+    } else if (!register && /user not found/.test(err.message)) {
+      toast("账号不存在，可点“注册并登录”创建");
+    } else {
+      toast("登录失败：" + err.message);
+    }
+  }
+}
+
+function logout() {
+  state.token = "";
+  state.username = "";
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  $("loginView").classList.remove("hidden");
+  $("filesView").classList.add("hidden");
+  $("userChip").classList.add("hidden");
+  $("btnLogout").classList.add("hidden");
+}
+
+function enterFiles() {
+  $("loginView").classList.add("hidden");
+  $("filesView").classList.remove("hidden");
+  $("userChip").textContent = state.username;
+  $("userChip").classList.remove("hidden");
+  $("btnLogout").classList.remove("hidden");
+  refreshList();
+}
+
+/* ---------- file list ---------- */
+async function refreshList() {
+  var ul = $("fileList");
+  ul.innerHTML = "";
+  $("fileEmpty").classList.add("hidden");
+  try {
+    var payload = await apiJson("/api/list");
+    state.files = payload.files || [];
+  } catch (err) {
+    toast(err.message);
+    return;
+  }
+  if (!state.files.length) {
+    $("fileEmpty").classList.remove("hidden");
+    return;
+  }
+  state.files.sort(function (a, b) { return a.path < b.path ? -1 : 1; });
+  state.files.forEach(function (f) {
+    var li = document.createElement("li");
+    li.innerHTML =
+      '<div class="finfo">' +
+        '<div class="fname">' + esc(f.path) + '<span class="fbadge">v' + f.version + '</span></div>' +
+        '<div class="fmeta">' + fmtSize(f.size) + '</div>' +
+      '</div>' +
+      '<div class="facts">' +
+        '<button class="btn btn-sm btn-dl" data-act="dl" data-path="' + esc(f.path) + '">下载</button>' +
+        '<button class="btn btn-sm btn-del" data-act="del" data-path="' + esc(f.path) + '">删除</button>' +
+      '</div>';
+    ul.appendChild(li);
+  });
+}
+
+/* ---------- upload ---------- */
+async function uploadFiles(fileList) {
+  var total = fileList.length;
+  if (!total) return;
+  toast("开始上传 " + total + " 个文件…");
+  var done = 0, conflicts = 0;
+  for (var i = 0; i < total; i++) {
+    var file = fileList[i];
+    var name = file.name.replace(/\\/g, "/").replace(/^\//, "");
+    if (name.indexOf("..") !== -1 || name.indexOf(":") !== -1 || !name) {
+      toast("跳过非法文件名：" + esc(name));
+      continue;
+    }
+    var bytes = new Uint8Array(await file.arrayBuffer());
+    var sha = sha256Bytes(bytes);
+    var base = 0;
+    for (var j = 0; j < state.files.length; j++) {
+      if (state.files[j].path === name) { base = state.files[j].version; break; }
+    }
+    try {
+      await uploadOne(name, bytes, sha, base);
+      done++;
+    } catch (err) {
+      if (err && err.conflict) {
+        // 服务端已被其他设备更新：本地文件另存为冲突副本后上传，不覆盖他人版本
+        conflicts++;
+        var copyName = conflictName(name);
+        toast("检测到冲突，保留副本 " + escapeText(copyName));
+        try {
+          await uploadOne(copyName, bytes, sha, 0);
+          done++;
+        } catch (err2) {
+          toast("冲突副本上传失败：" + err2.message);
+        }
+      } else {
+        toast("上传失败 " + name + "：" + (err && err.message));
+      }
+    }
+  }
+  await refreshList();
+  toast("上传完成：成功 " + done + " 个" + (conflicts ? "，冲突保留副本 " + conflicts + " 个" : ""));
+}
+
+async function uploadOne(name, bytes, sha, baseVersion) {
+  var resp = await apiFetch("/api/upload", {
+    method: "POST",
+    query: { path: name, version: baseVersion },
+    headers: apiHeaders({
+      "X-SHA256": sha,
+      "X-MTime": String(Date.now()),
+      "Content-Type": "application/octet-stream"
+    }),
+    body: bytes
+  });
+  if (resp.status === 409) {
+    var payload = await resp.json().catch(function () { return {}; });
+    var err = new Error(payload.error || "服务端文件已被其他设备更新");
+    err.conflict = true;
+    throw err;
+  }
+  if (!resp.ok) {
+    var text = await resp.text().catch(function () { return ""; });
+    throw new Error("HTTP " + resp.status + " " + text);
+  }
+}
+
+function conflictName(name) {
+  var dot = name.lastIndexOf(".");
+  var stem = dot > 0 ? name.slice(0, dot) : name;
+  var ext = dot > 0 ? name.slice(dot) : "";
+  var d = new Date();
+  function p2(n) { return (n < 10 ? "0" : "") + n; }
+  var ts = d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()) +
+           " " + p2(d.getHours()) + "-" + p2(d.getMinutes()) + "-" + p2(d.getSeconds());
+  return stem + " (conflict copy " + ts + ")" + ext;
+}
+
+function escapeText(s) { var d = document.createElement("span"); d.textContent = s; return d.textContent; }
+
+/* ---------- download ---------- */
+async function downloadFile(name) {
+  var idx = -1;
+  for (var i = 0; i < state.files.length; i++) {
+    if (state.files[i].path === name) { idx = i; break; }
+  }
+  var meta = idx >= 0 ? state.files[idx] : null;
+  // 旧 index 中的文件名被转义，用 DOM 保留真实名称：直接以按钮所在行查找
+  if (!meta) {
+    toast("文件不存在，请刷新");
+    return;
+  }
+  toast("正在下载 " + name + " …");
+  try {
+    var resp = await apiFetch("/api/download", {
+      query: { path: name },
+      headers: apiHeaders({})
+    });
+    if (!resp.ok) { toast("下载失败：HTTP " + resp.status); return; }
+    var blob = await resp.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name.split("/").pop() || name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+/* ---------- delete ---------- */
+async function deleteFile(name) {
+  if (!window.confirm("确定删除 “" + name + "” 吗？\n删除会同步到所有使用同一账号的设备。")) return;
+  var meta = null;
+  for (var i = 0; i < state.files.length; i++) {
+    if (state.files[i].path === name) { meta = state.files[i]; break; }
+  }
+  if (!meta) { toast("文件不存在，请刷新"); return; }
+  try {
+    await apiJson("/api/delete", {
+      method: "POST",
+      query: { path: name, version: meta.version }
+    });
+    toast("已删除 " + name);
+    refreshList();
+  } catch (err) {
+    toast("删除冲突，服务端已被其他设备修改，已刷新列表");
+    refreshList();
+  }
+}
+
+/* ---------- events ---------- */
+$("btnLogin").addEventListener("click", function () { doLogin(false); });
+$("btnRegister").addEventListener("click", function () { doLogin(true); });
+$("btnLogout").addEventListener("click", logout);
+$("btnRefresh").addEventListener("click", refreshList);
+
+var loginEnter = function (ev) {
+  if (ev.key === "Enter") doLogin(false);
+};
+$("loginUser").addEventListener("keydown", loginEnter);
+$("loginPass").addEventListener("keydown", loginEnter);
+
+$("fileInput").addEventListener("change", function (ev) {
+  var files = Array.prototype.slice.call(ev.target.files || []);
+  ev.target.value = "";
+  uploadFiles(files);
+});
+
+document.addEventListener("click", function (ev) {
+  var btn = ev.target.closest("button[data-act]");
+  if (!btn) return;
+  var name = btn.getAttribute("data-path");
+  if (btn.getAttribute("data-act") === "dl") downloadFile(name);
+  else deleteFile(name);
+});
+
+/* ---------- init ---------- */
+$("serverLabel").textContent = apiBase();
+if (state.token) {
+  // 已有 token：尝试直接进入文件页；失效则回到登录
+  enterFiles();
+} else {
+  logout();
+}
+</script>
+</body>
+</html>
